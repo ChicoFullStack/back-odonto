@@ -6,6 +6,16 @@ interface ITokenPayload {
   sub: string
 }
 
+declare global {
+  namespace Express {
+    interface Request {
+      user: {
+        id: string
+      }
+    }
+  }
+}
+
 export function ensureAuthenticated(
   request: Request,
   response: Response,

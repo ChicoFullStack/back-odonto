@@ -281,14 +281,11 @@ pacientesRoutes.get('/:pacienteId/prontuario/:prontuarioId/odontograma', async (
       prontuario: {
         pacienteId
       }
-    },
-    include: {
-      // procedimentos foi removido pois não existe no modelo
     }
   })
 
   if (!odontograma) {
-    return response.json({ procedimentos: [] })
+    return response.json({ dados: { procedimentos: [] } })
   }
 
   return response.json(odontograma)
@@ -321,24 +318,28 @@ pacientesRoutes.post('/:pacienteId/prontuario/:prontuarioId/odontograma', async 
     odontograma = await prisma.odontograma.create({
       data: {
         prontuarioId,
-        dados: {} // Adicionando o campo dados obrigatório com um objeto vazio inicial
+        dados: {
+          procedimentos: []
+        }
       }
     })
   }
 
-  // Criar o procedimento
+  // Atualizar o odontograma com o novo procedimento
+  const dadosAtualizados = {
+    ...odontograma.dados as Record<string, any>,
+    procedimentos: [
+      ...(((odontograma.dados as any)?.procedimentos as any[]) || []),
+      procedimentoData
+    ]
+  }
+
   const procedimento = await prisma.odontograma.update({
     where: {
       id: odontograma.id
     },
     data: {
-      dados: {
-        ...odontograma.dados,
-        procedimentos: [
-          ...(odontograma.dados.procedimentos || []),
-          procedimentoData
-        ]
-      }
+      dados: dadosAtualizados
     }
   })
 

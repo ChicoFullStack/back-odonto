@@ -31,7 +31,7 @@ authRoutes.post('/login', async (request, response) => {
 
   const token = sign({}, process.env.JWT_SECRET as string, {
     subject: usuario.id,
-    expiresIn: process.env.JWT_EXPIRES_IN,
+    expiresIn: '1d'
   })
 
   return response.json({

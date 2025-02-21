@@ -32,7 +32,7 @@ agendamentosRoutes.get('/hoje', async (request, response) => {
         paciente: {
           select: {
             nome: true,
-            telefone: true
+            telefoneCelular: true
           }
         },
         profissional: {

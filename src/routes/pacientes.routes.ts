@@ -41,7 +41,7 @@ pacientesRoutes.get('/', async (request, response) => {
         { status: 'ativo' }, // Filtra apenas pacientes ativos
         busca ? {
           OR: [
-            { nome: { contains: String(busca), mode: 'insensitive' } },
+            { nome: { contains: String(busca), mode: 'insensitive' as const } },
             { cpf: { contains: String(busca) } },
             { telefoneCelular: { contains: String(busca) } }
           ]
@@ -196,38 +196,53 @@ pacientesRoutes.patch('/:id/status', async (request, response) => {
 // Criar/Atualizar odontograma
 pacientesRoutes.post('/:id/prontuario/:prontuarioId/odontograma', async (request, response) => {
   const { id, prontuarioId } = request.params
-  const dados = request.body
+  const procedimentoData = request.body
 
-  const paciente = await prisma.paciente.findUnique({
-    where: { id },
-  })
-
-  if (!paciente) {
-    throw new AppError('Paciente não encontrado', 404)
-  }
-
-  const prontuario = await prisma.prontuario.findUnique({
-    where: { id: prontuarioId },
+  // Verificar se o prontuário existe e pertence ao paciente
+  const prontuario = await prisma.prontuario.findFirst({
+    where: {
+      id: prontuarioId,
+      pacienteId
+    }
   })
 
   if (!prontuario) {
     throw new AppError('Prontuário não encontrado', 404)
   }
 
-  const odontograma = await prisma.odontograma.upsert({
+  // Buscar ou criar o odontograma
+  let odontograma = await prisma.odontograma.findFirst({
     where: {
-      prontuarioId,
-    },
-    update: {
-      dados,
-    },
-    create: {
-      prontuarioId,
-      dados,
-    },
+      prontuarioId
+    }
   })
 
-  return response.json(odontograma)
+  if (!odontograma) {
+    odontograma = await prisma.odontograma.create({
+      data: {
+        prontuarioId,
+        dados: {} // Adicionando o campo dados obrigatório com um objeto vazio inicial
+      }
+    })
+  }
+
+  // Criar o procedimento
+  const procedimento = await prisma.odontograma.update({
+    where: {
+      id: odontograma.id
+    },
+    data: {
+      dados: {
+        ...odontograma.dados,
+        procedimentos: [
+          ...(odontograma.dados.procedimentos || []),
+          procedimentoData
+        ]
+      }
+    }
+  })
+
+  return response.json(procedimento)
 })
 
 // Buscar odontograma
@@ -268,7 +283,7 @@ pacientesRoutes.get('/:pacienteId/prontuario/:prontuarioId/odontograma', async (
       }
     },
     include: {
-      procedimentos: true
+      // procedimentos foi removido pois não existe no modelo
     }
   })
 
@@ -305,20 +320,29 @@ pacientesRoutes.post('/:pacienteId/prontuario/:prontuarioId/odontograma', async 
   if (!odontograma) {
     odontograma = await prisma.odontograma.create({
       data: {
-        prontuarioId
+        prontuarioId,
+        dados: {} // Adicionando o campo dados obrigatório com um objeto vazio inicial
       }
     })
   }
 
   // Criar o procedimento
-  const procedimento = await prisma.procedimentoOdontograma.create({
+  const procedimento = await prisma.odontograma.update({
+    where: {
+      id: odontograma.id
+    },
     data: {
-      ...procedimentoData,
-      odontogramaId: odontograma.id
+      dados: {
+        ...odontograma.dados,
+        procedimentos: [
+          ...(odontograma.dados.procedimentos || []),
+          procedimentoData
+        ]
+      }
     }
   })
 
-  return response.status(201).json(procedimento)
+  return response.json(procedimento)
 })
 
 // Excluir paciente

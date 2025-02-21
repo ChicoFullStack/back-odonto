@@ -277,10 +277,11 @@ pacientesRoutes.post('/:pacienteId/prontuario/:prontuarioId/odontograma', async 
   const { pacienteId, prontuarioId } = request.params
   
   // Validar o procedimento recebido
-  if (!isProcedimento(request.body)) {
+  const procedimentos = convertToProcedimentos([request.body]);
+  if (procedimentos.length === 0) {
     throw new AppError('Dados do procedimento inválidos', 400)
   }
-  const procedimentoData = request.body as Procedimento
+  const procedimentoData = procedimentos[0];
 
   // Verificar se o prontuário existe e pertence ao paciente
   const prontuario = await prisma.prontuario.findFirst({

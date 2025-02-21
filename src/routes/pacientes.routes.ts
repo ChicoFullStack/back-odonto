@@ -208,6 +208,37 @@ interface OdontogramaDados {
   procedimentos: Procedimento[];
 }
 
+// Função para converter array de JSON para array de Procedimento
+function convertToProcedimentos(arr: unknown): Procedimento[] {
+  if (!Array.isArray(arr)) return [];
+  return arr.filter((item): item is Procedimento => {
+    if (!item || typeof item !== 'object') return false;
+    const p = item as any;
+    return (
+      typeof p.dente === 'string' &&
+      typeof p.tipo === 'string' &&
+      (!p.face || typeof p.face === 'string') &&
+      (!p.observacao || typeof p.observacao === 'string') &&
+      (!p.id || typeof p.id === 'string') &&
+      (!p.data || typeof p.data === 'string')
+    );
+  });
+}
+
+// Função para converter dados para formato JSON do Prisma
+function convertToJsonData(dados: OdontogramaDados): Prisma.InputJsonValue {
+  return {
+    procedimentos: dados.procedimentos.map(proc => ({
+      id: proc.id || null,
+      dente: proc.dente,
+      face: proc.face || null,
+      tipo: proc.tipo,
+      observacao: proc.observacao || null,
+      data: proc.data
+    }))
+  };
+}
+
 // Rotas do Odontograma
 pacientesRoutes.get('/:pacienteId/prontuario/:prontuarioId/odontograma', async (request, response) => {
   const { pacienteId, prontuarioId } = request.params
@@ -222,28 +253,33 @@ pacientesRoutes.get('/:pacienteId/prontuario/:prontuarioId/odontograma', async (
   })
 
   if (!odontograma) {
+    const dadosVazios: OdontogramaDados = { procedimentos: [] };
     return response.json({ 
       id: null,
       prontuarioId,
-      dados: { procedimentos: [] } as OdontogramaDados,
+      dados: convertToJsonData(dadosVazios),
       createdAt: new Date(),
       updatedAt: new Date()
     })
   }
 
-  const dados = odontograma.dados as Prisma.JsonObject
-  const procedimentos = Array.isArray(dados?.procedimentos) ? dados.procedimentos as Procedimento[] : []
+  const dados = odontograma.dados as unknown;
+  const procedimentosRaw = Array.isArray(dados) ? dados : (dados as any)?.procedimentos;
+  const procedimentos = convertToProcedimentos(procedimentosRaw);
   
   return response.json({
     ...odontograma,
-    dados: {
-      procedimentos
-    } as OdontogramaDados
+    dados: convertToJsonData({ procedimentos })
   })
 })
 
 pacientesRoutes.post('/:pacienteId/prontuario/:prontuarioId/odontograma', async (request, response) => {
   const { pacienteId, prontuarioId } = request.params
+  
+  // Validar o procedimento recebido
+  if (!isProcedimento(request.body)) {
+    throw new AppError('Dados do procedimento inválidos', 400)
+  }
   const procedimentoData = request.body as Procedimento
 
   // Verificar se o prontuário existe e pertence ao paciente
@@ -265,26 +301,25 @@ pacientesRoutes.post('/:pacienteId/prontuario/:prontuarioId/odontograma', async 
     }
   })
 
-  const dadosIniciais = {
+  const dadosIniciais: OdontogramaDados = {
     procedimentos: []
-  } as const
+  }
 
   if (!odontograma) {
     odontograma = await prisma.odontograma.create({
       data: {
         prontuarioId,
-        dados: dadosIniciais
+        dados: convertToJsonData(dadosIniciais)
       }
     })
   }
 
   // Atualizar o odontograma com o novo procedimento
-  const dadosAtuais = odontograma.dados as Prisma.JsonObject
-  const procedimentosAtuais = Array.isArray(dadosAtuais?.procedimentos) 
-    ? dadosAtuais.procedimentos as Procedimento[]
-    : []
+  const dadosAtuais = odontograma.dados as Record<string, unknown>
+  const procedimentosRaw = dadosAtuais?.procedimentos as unknown
+  const procedimentosAtuais = convertToProcedimentos(procedimentosRaw)
   
-  const dadosAtualizados = {
+  const dadosAtualizados: OdontogramaDados = {
     procedimentos: [
       ...procedimentosAtuais,
       {
@@ -293,27 +328,24 @@ pacientesRoutes.post('/:pacienteId/prontuario/:prontuarioId/odontograma', async 
         data: new Date().toISOString()
       }
     ]
-  } as const
+  }
 
   const procedimento = await prisma.odontograma.update({
     where: {
       id: odontograma.id
     },
     data: {
-      dados: dadosAtualizados
+      dados: convertToJsonData(dadosAtualizados)
     }
   })
 
-  const dadosFinais = procedimento.dados as Prisma.JsonObject
-  const procedimentosFinais = Array.isArray(dadosFinais?.procedimentos)
-    ? dadosFinais.procedimentos as Procedimento[]
-    : []
+  const dadosFinais = procedimento.dados as Record<string, unknown>
+  const procedimentosFinaisRaw = dadosFinais?.procedimentos as unknown
+  const procedimentosFinais = convertToProcedimentos(procedimentosFinaisRaw)
 
   return response.json({
     ...procedimento,
-    dados: {
-      procedimentos: procedimentosFinais
-    } as OdontogramaDados
+    dados: convertToJsonData({ procedimentos: procedimentosFinais })
   })
 })
 

@@ -1,0 +1,202 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id        String   @id @default(uuid())
+  nome      String
+  email     String   @unique
+  senha     String
+  cargo     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("usuarios")
+}
+
+model Paciente {
+  id                String                @id @default(uuid())
+  nome              String
+  cpf               String                @unique
+  dataNascimento    DateTime
+  genero            String?
+  email             String?
+  telefoneCelular   String
+  telefoneFixo      String?
+  avatarUrl         String?
+  status            String                @default("ativo")
+  
+  // Endereço
+  cep               String?
+  logradouro        String?
+  numero            String?
+  complemento       String?
+  bairro            String?
+  cidade            String?
+  estado            String?
+
+  // Contato de Emergência
+  contatoEmergenciaNome       String?
+  contatoEmergenciaTelefone   String?
+  contatoEmergenciaParentesco String?
+
+  // Relacionamentos
+  agendamentos      Agendamento[]
+  prontuarios       Prontuario[]
+  documentos        Documento[]
+  historicoMedico   HistoricoMedico?
+  lancamentos       LancamentoFinanceiro[]
+
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@map("pacientes")
+}
+
+model Agendamento {
+  id            String    @id @default(uuid())
+  pacienteId    String
+  profissionalId String
+  data          DateTime
+  horaInicio    DateTime
+  horaFim       DateTime
+  procedimento  String
+  status        String    @default("agendado")
+  observacoes   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  paciente     Paciente     @relation(fields: [pacienteId], references: [id])
+  profissional Profissional @relation(fields: [profissionalId], references: [id])
+
+  @@map("agendamentos")
+}
+
+model Prontuario {
+  id          String   @id @default(uuid())
+  pacienteId  String
+  data        DateTime @default(now())
+  descricao   String
+  procedimento String
+  observacoes String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  odontograma Odontograma?
+
+  paciente    Paciente @relation(fields: [pacienteId], references: [id])
+
+  @@map("prontuarios")
+}
+
+model Documento {
+  id          String   @id @default(uuid())
+  pacienteId  String
+  nome        String
+  tipo        String
+  url         String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  paciente    Paciente @relation(fields: [pacienteId], references: [id])
+
+  @@map("documentos")
+}
+
+model HistoricoMedico {
+  id                String   @id @default(uuid())
+  pacienteId        String   @unique
+  alergias          String?
+  doencasCronicas   String?
+  cirurgiasPrevias  String?
+  medicamentosAtuais String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  paciente          Paciente @relation(fields: [pacienteId], references: [id])
+
+  @@map("historico_medico")
+}
+
+model Odontograma {
+  id           String   @id @default(uuid())
+  prontuarioId String   @unique
+  dados        Json     // Armazenará o estado do odontograma como JSON
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  prontuario   Prontuario @relation(fields: [prontuarioId], references: [id])
+
+  @@map("odontogramas")
+}
+
+enum Especialidade {
+  CLINICO_GERAL      @map("Clínico Geral")
+  ORTODONTISTA       @map("Ortodontista")
+  ENDODONTISTA       @map("Endodontista")
+  PERIODONTISTA      @map("Periodontista")
+  IMPLANTODONTISTA   @map("Implantodontista")
+  ODONTOPEDIATRA     @map("Odontopediatra")
+  CIRURGIAO          @map("Cirurgião Bucomaxilofacial")
+  PROTESISTA         @map("Prótese Dentária")
+  DENTISTICA         @map("Dentística")
+  ESTETICA           @map("Estética Dental")
+}
+
+model Profissional {
+  id             String        @id @default(uuid())
+  nome           String
+  email          String        @unique
+  telefone       String
+  cro            String        @unique
+  especialidade  Especialidade // Usando o enum
+  dataNascimento DateTime
+  cpf            String        @unique
+  rg             String?
+  logradouro     String?
+  numero         String?
+  complemento    String?
+  bairro         String?
+  cidade         String?
+  estado         String?
+  cep            String?
+  avatarUrl      String?
+  status         String        @default("ativo")
+  agendamentos   Agendamento[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@map("profissionais")
+}
+
+model LancamentoFinanceiro {
+  id             String    @id @default(uuid())
+  data           DateTime
+  tipo           String    // receita ou despesa
+  categoria      String
+  descricao      String
+  valor          Float
+  status         String    @default("pendente") // pendente, pago, cancelado
+  formaPagamento String?
+  pacienteId     String?
+  paciente       Paciente? @relation(fields: [pacienteId], references: [id])
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@map("lancamentos_financeiros")
+}
+
+model Configuracao {
+  id        String   @id @default(cuid())
+  clinica   Json
+  notificacoes Json
+  financeiro Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("configuracoes")
+} 

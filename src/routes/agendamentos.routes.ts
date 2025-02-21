@@ -31,12 +31,14 @@ agendamentosRoutes.get('/hoje', async (request, response) => {
       include: {
         paciente: {
           select: {
+            id: true,
             nome: true,
             telefoneCelular: true
           }
         },
         profissional: {
           select: {
+            id: true,
             nome: true
           }
         }
@@ -73,12 +75,14 @@ agendamentosRoutes.get('/proximos', async (request, response) => {
       include: {
         paciente: {
           select: {
+            id: true,
             nome: true,
             telefoneCelular: true
           }
         },
         profissional: {
           select: {
+            id: true,
             nome: true
           }
         }

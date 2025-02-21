@@ -29,10 +29,14 @@ authRoutes.post('/login', async (request, response) => {
     throw new AppError('Email ou senha incorretos', 401)
   }
 
-  const token = sign({}, process.env.JWT_SECRET as string, {
-    subject: usuario.id,
-    expiresIn: '1d'
-  })
+  const token = sign(
+    { nome: usuario.nome },
+    process.env.JWT_SECRET || 'default',
+    {
+      subject: usuario.id,
+      expiresIn: '1d'
+    }
+  )
 
   return response.json({
     usuario: {

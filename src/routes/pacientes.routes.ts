@@ -5,6 +5,8 @@ import { ensureAuthenticated } from '../middlewares/ensureAuthenticated'
 import multer from 'multer'
 import { uploadConfig } from '../config/upload'
 import { AppError } from '../errors/AppError'
+import { randomUUID } from 'crypto'
+import { Prisma } from '@prisma/client'
 
 const pacientesRoutes = Router()
 const upload = multer(uploadConfig)
@@ -193,83 +195,18 @@ pacientesRoutes.patch('/:id/status', async (request, response) => {
   return response.json(paciente)
 })
 
-// Criar/Atualizar odontograma
-pacientesRoutes.post('/:id/prontuario/:prontuarioId/odontograma', async (request, response) => {
-  const { id, prontuarioId } = request.params
-  const procedimentoData = request.body
+interface Procedimento {
+  id?: string;
+  dente: string;
+  face?: string;
+  tipo: string;
+  observacao?: string;
+  data: string;
+}
 
-  // Verificar se o prontuário existe e pertence ao paciente
-  const prontuario = await prisma.prontuario.findFirst({
-    where: {
-      id: prontuarioId,
-      pacienteId
-    }
-  })
-
-  if (!prontuario) {
-    throw new AppError('Prontuário não encontrado', 404)
-  }
-
-  // Buscar ou criar o odontograma
-  let odontograma = await prisma.odontograma.findFirst({
-    where: {
-      prontuarioId
-    }
-  })
-
-  if (!odontograma) {
-    odontograma = await prisma.odontograma.create({
-      data: {
-        prontuarioId,
-        dados: {} // Adicionando o campo dados obrigatório com um objeto vazio inicial
-      }
-    })
-  }
-
-  // Criar o procedimento
-  const procedimento = await prisma.odontograma.update({
-    where: {
-      id: odontograma.id
-    },
-    data: {
-      dados: {
-        ...odontograma.dados,
-        procedimentos: [
-          ...(odontograma.dados.procedimentos || []),
-          procedimentoData
-        ]
-      }
-    }
-  })
-
-  return response.json(procedimento)
-})
-
-// Buscar odontograma
-pacientesRoutes.get('/:id/prontuario/:prontuarioId/odontograma', async (request, response) => {
-  const { id, prontuarioId } = request.params
-
-  const paciente = await prisma.paciente.findUnique({
-    where: { id },
-  })
-
-  if (!paciente) {
-    throw new AppError('Paciente não encontrado', 404)
-  }
-
-  const prontuario = await prisma.prontuario.findUnique({
-    where: { id: prontuarioId },
-    include: {
-      odontograma: true,
-    },
-  })
-
-  if (!prontuario) {
-    throw new AppError('Prontuário não encontrado', 404)
-  }
-
-  return response.json(prontuario.odontograma)
-})
+interface OdontogramaDados {
+  procedimentos: Procedimento[];
+}
 
 // Rotas do Odontograma
 pacientesRoutes.get('/:pacienteId/prontuario/:prontuarioId/odontograma', async (request, response) => {
@@ -279,27 +216,33 @@ pacientesRoutes.get('/:pacienteId/prontuario/:prontuarioId/odontograma', async (
     where: {
       prontuarioId,
       prontuario: {
-        pacienteId
+        pacienteId: pacienteId
       }
     }
   })
 
   if (!odontograma) {
-    return response.json({ dados: { procedimentos: [] } })
+    return response.json({ dados: { procedimentos: [] } as OdontogramaDados })
   }
 
-  return response.json(odontograma)
+  const dados = odontograma.dados as Prisma.JsonObject
+  return response.json({
+    ...odontograma,
+    dados: {
+      procedimentos: (dados?.procedimentos as Procedimento[]) || []
+    } as OdontogramaDados
+  })
 })
 
 pacientesRoutes.post('/:pacienteId/prontuario/:prontuarioId/odontograma', async (request, response) => {
   const { pacienteId, prontuarioId } = request.params
-  const procedimentoData = request.body
+  const procedimentoData = request.body as Procedimento
 
   // Verificar se o prontuário existe e pertence ao paciente
   const prontuario = await prisma.prontuario.findFirst({
     where: {
       id: prontuarioId,
-      pacienteId
+      pacienteId: pacienteId
     }
   })
 
@@ -314,23 +257,31 @@ pacientesRoutes.post('/:pacienteId/prontuario/:prontuarioId/odontograma', async 
     }
   })
 
+  const dadosIniciais: OdontogramaDados = {
+    procedimentos: []
+  }
+
   if (!odontograma) {
     odontograma = await prisma.odontograma.create({
       data: {
         prontuarioId,
-        dados: {
-          procedimentos: []
-        }
+        dados: dadosIniciais as Prisma.JsonObject
       }
     })
   }
 
   // Atualizar o odontograma com o novo procedimento
-  const dadosAtualizados = {
-    ...odontograma.dados as Record<string, any>,
+  const dadosAtuais = odontograma.dados as Prisma.JsonObject
+  const procedimentosAtuais = ((dadosAtuais?.procedimentos as Procedimento[]) || [])
+  
+  const dadosAtualizados: OdontogramaDados = {
     procedimentos: [
-      ...(((odontograma.dados as any)?.procedimentos as any[]) || []),
-      procedimentoData
+      ...procedimentosAtuais,
+      {
+        ...procedimentoData,
+        id: randomUUID(),
+        data: new Date().toISOString()
+      }
     ]
   }
 
@@ -339,11 +290,16 @@ pacientesRoutes.post('/:pacienteId/prontuario/:prontuarioId/odontograma', async 
       id: odontograma.id
     },
     data: {
-      dados: dadosAtualizados
+      dados: dadosAtualizados as Prisma.JsonObject
     }
   })
 
-  return response.json(procedimento)
+  return response.json({
+    ...procedimento,
+    dados: {
+      procedimentos: ((procedimento.dados as Prisma.JsonObject)?.procedimentos as Procedimento[]) || []
+    } as OdontogramaDados
+  })
 })
 
 // Excluir paciente

@@ -3,11 +3,20 @@
   "version": "1.0.0",
   "description": "Backend para o sistema de gestão odontológica",
   "main": "src/server.ts",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
-    "build": "tsc",
+    "build": "prisma generate && tsc",
     "start": "node dist/server.js",
-    "create-admin": "ts-node src/scripts/createAdmin.ts"
+    "create-admin": "ts-node src/scripts/createAdmin.ts",
+    "test": "jest",
+    "migrate": "prisma migrate deploy",
+    "seed": "ts-node prisma/seed.ts",
+    "postinstall": "prisma generate",
+    "dokploy-build": "npm run build",
+    "dokploy-start": "npm run migrate && npm start"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
